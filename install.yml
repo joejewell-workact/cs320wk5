@@ -1,0 +1,72 @@
+---
+- name: Configure alma machine
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Install base packages
+      ansible.builtin.dnf:
+        name:
+          - firefox
+          - git
+          - httpd
+          - mariadb-server
+        state: present
+
+    - name: Import google signing key
+      ansible.builtin.rpm_key:
+        key: https://dl.google.com/linux/linux_signing_key.pub
+        state: present
+
+    - name: Install google chrome
+      ansible.builtin.dnf:
+        name: https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
+        state: present
+
+    - name: Copy html files to web root
+      ansible.builtin.copy:
+        src: html/
+        dest: /var/www/html/
+        owner: apache
+        group: apache
+        mode: '0644'
+        directory_mode: '0755'
+
+    - name: Remove chrome
+      ansible.builtin.dnf:
+        name: google-chrome-stable
+        state: absent
+
+    - name: Reboot the server and wait for it to return
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+
+    - name: Enable and restart httpd
+      ansible.builtin.systemd_service:
+        name: httpd
+        enabled: true
+        state: restarted
+
+    - name: Get service facts
+      ansible.builtin.service_facts:
+
+    - name: Confirm httpd is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['httpd.service'].state == 'running'
+        success_msg: httpd is running
+        fail_msg: httpd is not running, check journalctl -u httpd on the server
+
+    - name: Verify the copied HTML files are served over HTTP
+      ansible.builtin.uri:
+        url: "http://localhost/{{ item }}"
+        status_code: 200
+      loop:
+        - index.html
+        - dogs.html
+        - cats.html
+      register: web_checks
+
+    - name: Report which pages verified OK
+      ansible.builtin.debug:
+        msg: "{{ web_checks.results | selectattr('status', 'equalto', 200) | map(attribute='url') | list }}"
