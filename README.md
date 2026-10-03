@@ -34,6 +34,7 @@ ansible_python_interpreter=/usr/bin/python3
 ## How to run
 simply run this command after cloning repo (note: you will need to install ansible and make sure you have ssh access to the assets listed in inventory.)
 ```
-ansible-playbook install.yml
+ansible-playbook install.yml -K
 ```
-```
+The capital K flag allows you to enter the BECOME password which intern lets you run sudo commands.
+
